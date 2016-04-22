@@ -1,15 +1,27 @@
 package RayTracing.DM.Math;
 
-public class Vector {
+public class Vector extends Base3DComponent{
+
+	public Vector() {
+		super();
+	}
+
+	@Override
+	protected Base3DComponent newInstance() {
+		return new Vector();
+	}
 	
-	public double X;
-	public double Y;
-	public double Z;
+	public Vector(double x,double y,double z) {
+		super(x,y,z);
+	}
 	
-	public Vector(double x,double y,double z)
-	{
-		X=x;
-		Y=y;
-		Z=z;
+	public double dotProduct(Vector other){
+		double result = 0;
+		
+		for (int i = 0; i < 3; i++){
+			result += this.getCoordinate(i) * other.getCoordinate(i);
+		}
+		
+		return result;
 	}
 }
