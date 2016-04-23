@@ -18,7 +18,4 @@ public class Camera {
 		ScreenDistance = screenDistance;
 		ScreenWidth = screenWidth;
 	}
-	
-	
-
 }
