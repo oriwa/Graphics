@@ -14,14 +14,17 @@ public class MathHelper {
 	
 	public static Vector getNormalizeVector(Point from,Point to)
 	{
-		Vector vector=new Vector(from.getCoordinate(0)-to.getCoordinate(0), from.getCoordinate(1)-to.getCoordinate(1), from.getCoordinate(2)-to.getCoordinate(2));
-		double norm =norm( vector);
-		vector.scalarMult(1/norm);
-		return vector;
+		Vector vector=new Vector(to.getCoordinate(0)-from.getCoordinate(0), to.getCoordinate(1)-from.getCoordinate(1), to.getCoordinate(2)-from.getCoordinate(2));
+		double norm =vector.norm();
+		return (Vector) vector.scalarMult(1/norm);
 	}
 	
-	public static double norm(Vector vector)
+	
+	public static Vector crossProduct(Vector vector,Vector vector2)
 	{
-		return Math.sqrt((Math.pow(vector.getCoordinate(0), 2)+Math.pow(vector.getCoordinate(1), 2)+Math.pow(vector.getCoordinate(2), 2)));
+		double x=vector.getCoordinate(1)*vector2.getCoordinate(2)-vector.getCoordinate(2)*vector2.getCoordinate(1);
+		double y=vector.getCoordinate(2)*vector2.getCoordinate(0)-vector.getCoordinate(0)*vector2.getCoordinate(2);
+		double z=vector.getCoordinate(0)*vector2.getCoordinate(1)-vector.getCoordinate(1)*vector2.getCoordinate(0);				
+		return new Vector(x,y,z);
 	}
 }

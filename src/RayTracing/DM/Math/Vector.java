@@ -15,7 +15,7 @@ public class Vector extends Base3DComponent{
 		super(x,y,z);
 	}
 	
-	public double dotProduct(Vector other){
+	public double dotProduct(Base3DComponent other){
 		double result = 0;
 		
 		for (int i = 0; i < 3; i++){
@@ -23,5 +23,11 @@ public class Vector extends Base3DComponent{
 		}
 		
 		return result;
+	}
+	
+
+	public double norm()
+	{
+		return Math.sqrt((Math.pow(this.getCoordinate(0), 2)+Math.pow(this.getCoordinate(1), 2)+Math.pow(this.getCoordinate(2), 2)));
 	}
 }
