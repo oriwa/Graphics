@@ -39,6 +39,6 @@ public class Cylinder extends Surface {
 		
 		Point intersectionPoint = distance1 > distance2 ? p2 : p1;
 		
-		return new Intersection(intersectionPoint);
+		return new Intersection(intersectionPoint,this);
 	}
 }

@@ -1,20 +1,17 @@
 package RayTracing;
 
-import RayTracing.DM.Color;
+import RayTracing.DM.Surface;
 import RayTracing.DM.Math.Point;
 
 public class Intersection {
 	private Point point;
-	private Color color;
+	private Surface surface;
 	
-	public Intersection(Point point, Color color){
-		this.point = point;
-		this.color = color;
+	public Intersection(Point point, Surface surface){
+		this.setPoint( point);
+		this.setSurface(surface);
 	}
-	
-	public Intersection(Point point) {
-		this.point = point;
-	}
+	 
 
 	public Point getPoint() {
 		return point;
@@ -22,10 +19,12 @@ public class Intersection {
 	public void setPoint(Point point) {
 		this.point = point;
 	}
-	public Color getColor() {
-		return color;
+
+	public Surface getSurface() {
+		return surface;
 	}
-	public void setColor(Color color) {
-		this.color = color;
+
+	public void setSurface(Surface surface) {
+		this.surface = surface;
 	}
 }

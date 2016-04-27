@@ -103,7 +103,7 @@ public class RayTracer {
 
 				if (code.equals("cam"))
 				{
-					Camera=new Camera(ArrayToVector(params, 0),ArrayToVector(params, 3),ArrayToVector(params, 6),Double.parseDouble(params[9]),Double.parseDouble(params[10]));                 
+					Camera=new Camera(ArrayToPoint(params, 0),ArrayToPoint(params, 3),ArrayToVector(params, 6),Double.parseDouble(params[9]),Double.parseDouble(params[10]));                 
 					System.out.println(String.format("Parsed camera parameters (line %d)", lineNum));
 				}
 				else if (code.equals("set"))
@@ -184,8 +184,21 @@ public class RayTracer {
 
 		// Create a byte array to hold the pixel data:
 		byte[] rgbData = new byte[this.imageWidth * this.imageHeight * 3];
-
-
+		double ratio=imageWidth/imageHeight;
+		Camera.ScreenHeight=Camera.ScreenWidth*(1/ratio);
+		double sacle=(Camera.ScreenHeight/2)/Camera.ScreenDistance;
+		for(int i=0;i<imageWidth;i++)
+		{
+			for(int j=0;j<imageHeight;j++)
+			{
+				Ray ray=ConstructRayThroughPixel(i,j);
+				Color color=GetColor(ray,Settings.MaxRecursion);
+				rgbData[(j * this.imageWidth + i) * 3]=color.getRInByte();
+				rgbData[(j * this.imageWidth + i) * 3]=color.getRInByte();
+				rgbData[(j * this.imageWidth + i) * 3]=color.getRInByte();
+				
+			}
+		}
                 // Put your ray tracing code here!
                 //
                 // Write pixel color values in RGB format to rgbData:
@@ -211,9 +224,36 @@ public class RayTracer {
 	}
 
 
+	private Ray ConstructRayThroughPixel(int i, int j) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+	
+
+	private Color GetColor(Ray ray,int recursionNum) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+	
+	private Intersection GetMinIntersection(Ray ray) {
+		
+		double minDistance=Double.MAX_VALUE;
+		Intersection minIntersection=null;
+		for (Surface surface : Surfaces) {
+			Intersection surfaceIntersection=surface.findIntersection(ray);
+			if(surfaceIntersection!=null)
+			{
+				double surfaceDistance=Double.MAX_VALUE;
+			}
+		}
+		return minIntersection;
+	}
+
+
 
 
 	//////////////////////// FUNCTIONS TO SAVE IMAGES IN PNG FORMAT //////////////////////////////////////////
+
 
 	/*
 	 * Saves RGB data as an image in png format to the specified location.
