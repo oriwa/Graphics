@@ -7,6 +7,9 @@ public abstract class Base3DComponent {
 	public Base3DComponent()
 	{
 		coordinates = new double[3];
+		coordinates[0]=0.0;
+		coordinates[1]=0.0;
+		coordinates[2]=0.0;
 	}
 
 	public Base3DComponent(double x,double y,double z)
@@ -51,6 +54,15 @@ public abstract class Base3DComponent {
 		}
 		
 		return result;
+	}
+	
+	public boolean equals(Base3DComponent other)
+	{
+		for (int i = 0; i < 3; i++){
+			if(this.getCoordinate(i) != other.getCoordinate(i))
+					return false;
+		}
+		return true;
 	}
 
 	
