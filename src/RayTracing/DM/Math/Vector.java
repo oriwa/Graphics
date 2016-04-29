@@ -30,4 +30,11 @@ public class Vector extends Base3DComponent{
 	{
 		return Math.sqrt((Math.pow(this.getCoordinate(0), 2)+Math.pow(this.getCoordinate(1), 2)+Math.pow(this.getCoordinate(2), 2)));
 	}
+	
+	public Vector normalize()
+	{
+		scalarMult(1/norm());
+		return this;
+	}
+	
 }

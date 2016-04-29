@@ -49,4 +49,10 @@ public class Cylinder extends Surface {
 		}
 		return new Intersection(intersectionPoint, this, distance);
 	}
+
+	@Override
+	public Vector getNormal(Point point,Vector ray) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

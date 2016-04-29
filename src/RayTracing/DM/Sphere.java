@@ -25,10 +25,8 @@ public class Sphere extends Surface {
 
 		double[] solution = MathHelper.solveQuadraticEquation(a, b, c);
 
-		Point p1 = (Point) ray.getSource().add(
-				ray.getDirection().scalarMult(solution[0]));
-		Point p2 = (Point) ray.getSource().add(
-				ray.getDirection().scalarMult(solution[1]));
+		Point p1 = (Point) ray.getSource().add(ray.getDirection().scalarMult(solution[0]));
+		Point p2 = (Point) ray.getSource().add(ray.getDirection().scalarMult(solution[1]));
 
 		double distance1 = ray.getSource().calcDistance(p1);
 		double distance2 = ray.getSource().calcDistance(p2);
@@ -42,6 +40,15 @@ public class Sphere extends Surface {
 			distance = distance1;
 		}
 		return new Intersection(intersectionPoint, this, distance);
+	}
+
+	@Override
+	public Vector getNormal(Point point, Vector ray) {
+		Vector vector = MathHelper.getNormalizeVector(Center, point);
+		if (Math.acos(vector.dotProduct(ray)) > 0.5 * Math.PI)
+			return (Vector) vector.scalarMult(-1);
+
+		return vector;
 	}
 
 }

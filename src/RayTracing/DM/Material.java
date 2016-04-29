@@ -4,11 +4,11 @@ public class Material {
 
 	public Color Diffuse;
 	public Color Specular;
-	public double Phong;
 	public Color Reflection;
+	public double Phong;
 	public double Transparency;
 	
-	public Material(Color diffuse, Color specular, double phong, Color reflection, double transparency)
+	public Material(Color diffuse, Color specular, Color reflection, double phong, double transparency)
 	{
 		Diffuse = diffuse;
 		Specular = specular;

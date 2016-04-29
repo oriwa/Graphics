@@ -25,5 +25,10 @@ public class Plane extends Surface {
 		Point interPoint=ray.getPointOnRay(t);
 		return new Intersection(interPoint,this,t);
 	}
+
+	@Override
+	public Vector getNormal(Point point,Vector ray) {
+		return Normal;
+	}
 	
 }
