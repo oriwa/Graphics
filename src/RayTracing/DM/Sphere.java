@@ -19,7 +19,7 @@ public class Sphere extends Surface {
 	@Override
 	public Intersection findIntersection(Ray ray) {
 
-		Vector v = (Vector) Center.substruct(ray.getSource());
+		Point v = (Point) Center.substruct(ray.getSource());
 
 		double vd = v.dotProduct(ray.getDirection());
 		if (vd < 0) {
