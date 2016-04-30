@@ -64,6 +64,16 @@ public abstract class Base3DComponent {
 		}
 		return true;
 	}
+	
+	public double dotProduct(Base3DComponent other){
+		double result = 0;
+		
+		for (int i = 0; i < 3; i++){
+			result += this.getCoordinate(i) * other.getCoordinate(i);
+		}
+		
+		return result;
+	}
 
 	
 	public double getCoordinate(int index){

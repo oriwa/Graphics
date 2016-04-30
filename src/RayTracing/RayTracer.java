@@ -150,6 +150,7 @@ public class RayTracer {
 
 	}
 
+	
 	private Color ArrayToColor(String[] array, int index) {
 		return new Color(Double.parseDouble(array[index]), Double.parseDouble(array[index + 1]),
 				Double.parseDouble(array[index + 2]));
@@ -179,7 +180,7 @@ public class RayTracer {
 
 		for (int i = 0; i < imageWidth; i++) {
 			for (int j = 0; j < imageHeight; j++) {
-				if (i == 315 && j == 266)
+				if (i == 220 && j == 490)
 					sacle = (camera.ScreenHeight / 2) / camera.ScreenDistance;
 				Ray ray = constructRayThroughPixel(i, j);
 				Color color = getColor(ray, settings.MaxRecursion, null);
@@ -190,16 +191,6 @@ public class RayTracer {
 
 			System.out.println(i);
 		}
-		// Put your ray tracing code here!
-		//
-		// Write pixel color values in RGB format to rgbData:
-		// Pixel [x, y] red component is in rgbData[(y * this.imageWidth + x) *
-		// 3]
-		// green component is in rgbData[(y * this.imageWidth + x) * 3 + 1]
-		// blue component is in rgbData[(y * this.imageWidth + x) * 3 + 2]
-		//
-		// Each of the red, green and blue components should be a byte, i.e.
-		// 0-255
 
 		long endTime = System.currentTimeMillis();
 		Long renderTime = endTime - startTime;
@@ -241,6 +232,7 @@ public class RayTracer {
 		if (intersection == null)
 			return settings.Background;
 		Surface surface = intersection.getSurface();
+		
 		Color diffuseColor = new Color();
 		Color specularColor = new Color();
 		if (surface.Material.Transparency != 1) {
@@ -252,9 +244,11 @@ public class RayTracer {
 			specularColor = diffuseColor.multColor(specularColor.multColor(surface.Material.Specular));
 			diffuseColor = diffuseColor.multColor(surface.Material.Diffuse);
 		}
+		
 		Color backgroundColor = new Color();
 		if (surface.Material.Transparency != 0)
 			backgroundColor = getColor(ray, recursionNum - 1, surface);
+		
 		Color reflectionColor = new Color();
 		if (!surface.Material.Reflection.equals(new Color()))
 			reflectionColor = getReflectionColor(ray, recursionNum, intersection, surface);
@@ -294,32 +288,26 @@ public class RayTracer {
 		double offsetPlane = normalPlane.dotProduct(light.Position);
 		double sumOfPoint = Math.pow(settings.ShadowRays, 2);
 
+		Vector shadowColors = new Vector();
 		Vector w = normalPlane;
-		Vector u = MathHelper.crossProduct(w, findPlaneUpVector(normalPlane, offsetPlane, light.Position));
+		Vector up = findPlaneUpVector(normalPlane, offsetPlane, light.Position);
+		Vector u = MathHelper.crossProduct(w, up);
+		if (u.equals(new Vector()))
+			u = up;
 		Vector v = MathHelper.crossProduct(u, w);
 
-		double pixelW = light.Radius / settings.ShadowRays;
-		double pixelH = light.Radius / settings.ShadowRays;
+		double pixel = light.Radius / settings.ShadowRays;
 		Random rnd = new Random();
-
-		Vector shadowColors = new Vector();
 		for (int i = 0; i < settings.ShadowRays; i++) {
 			for (int j = 0; j < settings.ShadowRays; j++) {
 
-				Vector uDelta = (Vector) u.scalarMult(pixelW * ((settings.ShadowRays / 2) - i + rnd.nextDouble()));
-				Vector vDelta = (Vector) v.scalarMult(pixelH * ((settings.ShadowRays / 2) - j + rnd.nextDouble()));
+				Vector uDelta = (Vector) u.scalarMult(pixel * ((settings.ShadowRays / 2) - i + rnd.nextDouble()));
+				Vector vDelta = (Vector) v.scalarMult(pixel * ((settings.ShadowRays / 2) - j + rnd.nextDouble()));
 
 				Point res = (Point) light.Position.add(uDelta.add(vDelta));
 
 				Ray shadowRay = new Ray(res, MathHelper.getNormalizeVector(res, intersection.getPoint()));
-				double distance = intersection.getPoint().calcDistance(res);
-				ArrayList<Intersection> intersections = getClouserIntersection(shadowRay, null,
-						intersection.getPoint().calcDistance(res));
-				Vector shadowColor = new Vector(light.Color.getR(), light.Color.getG(), light.Color.getB());
-				for (Intersection intersection2 : intersections) {
-					if (intersection2.getPoint().calcDistance(intersection.getPoint()) > 0.0001)
-						shadowColor = (Vector) shadowColor.scalarMult(intersection2.getSurface().Material.Transparency);
-				}
+				Vector shadowColor = getShdowColor(light, intersection, res, shadowRay);
 				shadowColors = (Vector) shadowColors.add(shadowColor);
 			}
 		}
@@ -327,39 +315,52 @@ public class RayTracer {
 		Color lightColor = new Color(shadowColors.getCoordinate(0), shadowColors.getCoordinate(1),
 				shadowColors.getCoordinate(2));
 		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
-		return lightColor.mult(Math.abs(normal.dotProduct(normalPlane.scalarMult(-1))) * light.ShadowIntensity);
+		return lightColor.mult(Math.abs(normal.dotProduct(normalPlane.scalarMult(-1))));
+	}
+
+	private Vector getShdowColor(Light light, Intersection intersection, Point res, Ray shadowRay) {
+		ArrayList<Intersection> intersections = getClouserIntersection(shadowRay, null,
+				intersection.getPoint().calcDistance(res));
+		Vector shadowColor = new Vector(light.Color.getR(), light.Color.getG(), light.Color.getB());
+		boolean hasShadow = false;
+		double shadow = 1.0;
+		for (Intersection intersection2 : intersections) {
+			if (intersection2.getPoint().calcDistance(intersection.getPoint()) > 0.0001) {
+				// shadowColor = (Vector)
+				// shadowColor.scalarMult(intersection2.getSurface().Material.Transparency);
+				shadow *= intersection2.getSurface().Material.Transparency;
+				hasShadow = true;
+			}
+		}
+		if (hasShadow) {
+			// shadowColor = (Vector) shadowColor.scalarMult();
+
+			shadowColor = (Vector) shadowColor.scalarMult(Math.max(shadow,1 - light.ShadowIntensity));
+			/*if (shadow != 0)
+				shadowColor = (Vector) shadowColor.scalarMult(Math.max(shadow,1 - light.ShadowIntensity);
+			else
+				shadowColor = (Vector) shadowColor.scalarMult(());*/
+
+		}
+		return shadowColor;
 	}
 
 	private Vector findPlaneUpVector(Vector normalPlane, double offsetPlane, Point position) {
 
 		Point planePoint = null;
+		double newValue = offsetPlane;
+		if (offsetPlane == 0)
+			newValue = 1;
 		if (normalPlane.getCoordinate(0) != 0.0)
-			planePoint = new Point(offsetPlane, 0, 0);
+			planePoint = new Point(newValue, 0, 0);
 		else if (normalPlane.getCoordinate(1) != 0.0)
-			planePoint = new Point(0, offsetPlane, 0);
+			planePoint = new Point(0, newValue, 0);
 		else
-			planePoint = new Point(0, 0, offsetPlane);
+			planePoint = new Point(0, 0, newValue);
 		return MathHelper.getNormalizeVector(position, planePoint);
 
 	}
 
-	private Ray constructRayThroughPlane(int i, int j) {
-
-		Vector w = camera.Direction;
-		Vector u = MathHelper.crossProduct(w, camera.Up);
-		Vector v = MathHelper.crossProduct(u, w);
-
-		double pixelW = camera.ScreenWidth / imageWidth;
-		double pixelH = camera.ScreenHeight / imageHeight;
-		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance);
-		Vector uDelta = (Vector) u.scalarMult(pixelW * ((imageWidth / 2) - i + 0.5));
-		Vector vDelta = (Vector) v.scalarMult(pixelH * ((imageHeight / 2) - j + 0.5));
-
-		Point res = (Point) camera.Position.add(wDelta.add(uDelta).add(vDelta));
-
-		return new Ray(res, MathHelper.getNormalizeVector(camera.Position, res));
-
-	}
 
 	private Intersection getMinIntersection(Ray ray, Surface currentSurface) {
 
@@ -388,7 +389,7 @@ public class RayTracer {
 			if (surfaceIntersection != null) {
 				if (surfaceIntersection != null) {
 					double newDistance = surfaceIntersection.getDistance();
-					if (distance > newDistance) {
+					if (newDistance > 0 && distance > newDistance) {
 						intersections.add(surfaceIntersection);
 					}
 				}
