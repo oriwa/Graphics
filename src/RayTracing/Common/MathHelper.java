@@ -4,6 +4,8 @@ import RayTracing.DM.Math.*;
 
 public class MathHelper {
 
+	public final static double EPSILON=0.0001;
+	
 	public static double[] solveQuadraticEquation(double a, double b, double c){
 		double roots[] = new double[2];
 		double delta=Math.pow(b, 2) - 4*a*c;

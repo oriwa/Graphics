@@ -176,16 +176,22 @@ public class RayTracer {
 		double ratio = imageWidth / imageHeight;
 		camera.ScreenHeight = camera.ScreenWidth * (1 / ratio);
 		double sacle = (camera.ScreenHeight / 2) / camera.ScreenDistance;
-
+		int lastPercent = -1;
 		for (int i = 0; i < imageWidth; i++) {
 			for (int j = 0; j < imageHeight; j++) {
-				if (i == 275 && j == 433)
+				if (i == 250 && j == 236)
 					sacle = (camera.ScreenHeight / 2) / camera.ScreenDistance;
+				sacle++;
 				Ray ray = constructRayThroughPixel(i, j);
 				Color color = getColor(ray, settings.MaxRecursion, null);
 				rgbData[(j * this.imageWidth + i) * 3] = color.getRInByte();
 				rgbData[(j * this.imageWidth + i) * 3 + 1] = color.getGInByte();
 				rgbData[(j * this.imageWidth + i) * 3 + 2] = color.getBInByte();
+			}
+			int percent = i*100/imageWidth;
+			if (percent != lastPercent) {
+				System.out.println("Rendering . . .  " + percent + "%");
+				lastPercent = percent;
 			}
 		}
 
@@ -212,11 +218,12 @@ public class RayTracer {
 
 		double pixelW = camera.ScreenWidth / imageWidth;
 		double pixelH = camera.ScreenHeight / imageHeight;
-		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance);
+
+		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance); 	
 		Vector uDelta = (Vector) u.scalarMult(pixelW * ((imageWidth / 2) - i + 0.5));
 		Vector vDelta = (Vector) v.scalarMult(pixelH * ((imageHeight / 2) - j + 0.5));
 
-		Point res = (Point) camera.Position.add(wDelta.add(uDelta).add(vDelta));
+		Point res = (Point) camera.Position.add(wDelta).add(uDelta).add(vDelta);
 
 		return new Ray(res, MathHelper.getNormalizeVector(camera.Position, res));
 
@@ -237,14 +244,13 @@ public class RayTracer {
 				diffuseColor = diffuseColor.addColor(getColor(light, ray, intersection));
 				specularColor = specularColor.addColor(getSpecularColor(light, ray, intersection));
 			}
-
 			specularColor = diffuseColor.multColor(specularColor.multColor(surface.Material.Specular));
 			diffuseColor = diffuseColor.multColor(surface.Material.Diffuse);
 		}
 
 		Color backgroundColor = new Color();
 		if (surface.Material.Transparency != 0)
-			backgroundColor = getColor(ray, recursionNum - 1, surface);
+			backgroundColor = getColor(new Ray(intersection.getPoint(), ray.getDirection()), recursionNum - 1, surface);
 
 		Color reflectionColor = new Color();
 		if (!surface.Material.Reflection.equals(new Color()))
@@ -278,7 +284,7 @@ public class RayTracer {
 		Vector v = (Vector) ray.getDirection().scalarMult(-1);
 		double theta = v.dotProduct(r);
 		if (theta < 0)
-			theta = v.dotProduct(r.scalarMult(-1));
+			return new Color();
 		double phong = Math.pow(theta, intersection.getSurface().Material.Phong);
 		return light.Color.mult(phong * light.SpecularIntensity);
 	}
@@ -319,13 +325,13 @@ public class RayTracer {
 	}
 
 	private Vector getShdowColor(Light light, Intersection intersection, Point res, Ray shadowRay) {
-		ArrayList<Intersection> intersections = getClouserIntersection(shadowRay, null,
+		ArrayList<Intersection> intersections = getCloserIntersection(shadowRay, null,
 				intersection.getPoint().calcDistance(res));
 		Vector shadowColor = new Vector(light.Color.getR(), light.Color.getG(), light.Color.getB());
 		boolean hasShadow = false;
 		double shadow = 1.0;
 		for (Intersection intersection2 : intersections) {
-			if (intersection2.getPoint().calcDistance(intersection.getPoint()) > 0.0001) {
+			if (intersection2.getPoint().calcDistance(intersection.getPoint()) >MathHelper.EPSILON) {
 				// shadowColor = (Vector)
 				// shadowColor.scalarMult(intersection2.getSurface().Material.Transparency);
 				shadow *= intersection2.getSurface().Material.Transparency;
@@ -382,7 +388,7 @@ public class RayTracer {
 		return minIntersection;
 	}
 
-	private ArrayList<Intersection> getClouserIntersection(Ray ray, Surface currentSurface, double distance) {
+	private ArrayList<Intersection> getCloserIntersection(Ray ray, Surface currentSurface, double distance) {
 
 		ArrayList<Intersection> intersections = new ArrayList<Intersection>();
 		for (Surface surface : surfaces) {

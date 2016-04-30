@@ -25,6 +25,6 @@ public class Camera {
 
 	private void InitCamera() 
 	{
-		Direction=MathHelper.getNormalizeVector(Position, LookAtPoint);		
+		Direction = MathHelper.getNormalizeVector(Position, LookAtPoint);		
 	}
 }
