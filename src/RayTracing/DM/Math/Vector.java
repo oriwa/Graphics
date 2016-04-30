@@ -15,15 +15,7 @@ public class Vector extends Base3DComponent{
 		super(x,y,z);
 	}
 	
-	public double dotProduct(Base3DComponent other){
-		double result = 0;
-		
-		for (int i = 0; i < 3; i++){
-			result += this.getCoordinate(i) * other.getCoordinate(i);
-		}
-		
-		return result;
-	}
+	
 	
 	public Vector matrixMult(Base3DComponent[] matrix){
 		Vector result = new Vector();

@@ -18,28 +18,23 @@ public class Sphere extends Surface {
 
 	@Override
 	public Intersection findIntersection(Ray ray) {
-		double a = 1;
-		Vector v = ((Point)ray.getSource().substruct(Center)).toVector();
-		double b = 2 * ray.getDirection().dotProduct(v);
-		double c = v.dotProduct(v) - Radius * Radius;
 
-		double[] solution = MathHelper.solveQuadraticEquation(a, b, c);
+		Vector v = (Vector) Center.substruct(ray.getSource());
 
-		Point p1 = (Point) ray.getSource().add(ray.getDirection().scalarMult(solution[0]));
-		Point p2 = (Point) ray.getSource().add(ray.getDirection().scalarMult(solution[1]));
-
-		double distance1 = ray.getSource().calcDistance(p1);
-		double distance2 = ray.getSource().calcDistance(p2);
-		Point intersectionPoint = null;
-		double distance;
-		if (distance1 > distance2) {
-			intersectionPoint = p2;
-			distance = distance2;
-		} else {
-			intersectionPoint = p1;
-			distance = distance1;
+		double vd = v.dotProduct(ray.getDirection());
+		if (vd < 0) {
+			return null;
 		}
-		return new Intersection(intersectionPoint, this, distance);
+
+		double v2_vd2 = v.dotProduct(v) - Math.pow(vd, 2);
+		if (v2_vd2 > Math.pow(Radius, 2)) {
+			return null;
+		}
+
+		double det = Math.sqrt(Math.pow(Radius, 2) - v2_vd2);
+		double distance = vd - det;
+		Point p = (Point) ray.getSource().add(ray.getDirection().scalarMult(distance));
+		return new Intersection(p, this, distance);
 	}
 
 	@Override

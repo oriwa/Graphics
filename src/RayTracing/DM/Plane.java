@@ -28,7 +28,7 @@ public class Plane extends Surface {
 
 	@Override
 	public Vector getNormal(Point point,Vector ray) {
-		return Normal;
+		return Normal.normalize();
 	}
 	
 }

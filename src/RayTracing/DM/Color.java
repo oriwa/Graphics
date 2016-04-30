@@ -18,7 +18,7 @@ public class Color {
 	}
 
 	public void setR(double r) {
-		this.r = Math.min(1.0, r);
+		this.r =  r;
 	}
 
 	public double getG() {
@@ -26,7 +26,7 @@ public class Color {
 	}
 
 	public void setG(double g) {
-		this.g = Math.min(1.0, g);
+		this.g =  g;
 	}
 
 	public double getB() {
@@ -34,7 +34,7 @@ public class Color {
 	}
 
 	public void setB(double b) {
-		this.b = Math.min(1.0, b);
+		this.b = b;
 	}
 
 	public Color(double r,double g,double b)
