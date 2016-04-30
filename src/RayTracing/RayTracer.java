@@ -244,7 +244,7 @@ public class RayTracer {
 		Color backgroundColor=getColor(ray,recursionNum-1,surface);
 		
 		Vector reflectionNormal=intersection.getSurface().getNormal(intersection.getPoint(),ray.getDirection());
-		Vector reflectionVector=reflectionNormal.scalarMult(2*reflectionNormal.dotProduct(ray.getDirection())).substruct(ray.getDirection());
+		Vector reflectionVector=(Vector) reflectionNormal.scalarMult(2*reflectionNormal.dotProduct(ray.getDirection())).substruct(ray.getDirection());
 		reflectionVector = (Vector) reflectionVector.normalize().scalarMult(-1);
 		Ray reflectionRay = new Ray(intersection.getPoint(), reflectionNormal);
 		Color reflectionColor=getColor(new Ray(reflectionRay.getPointOnRay(0), reflectionVector), recursionNum-1,surface).multColor(surface.Material.Reflection);

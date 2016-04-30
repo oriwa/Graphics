@@ -25,4 +25,8 @@ public class Point extends Base3DComponent{
 		
 		return Math.sqrt(distance);
 	}
+	
+	public Vector toVector(){
+		return new Vector(getCoordinate(0),getCoordinate(1),getCoordinate(2));
+	}
 }

@@ -42,8 +42,8 @@ public abstract class Base3DComponent {
 		return result;
 	}
 	
-	public Vector substruct(Base3DComponent other){
-		Vector result = new Vector();
+	public Base3DComponent substruct(Base3DComponent other){
+		Base3DComponent result = this.newInstance();
 		
 		for (int i = 0; i < 3; i++){
 			double value = this.getCoordinate(i) - other.getCoordinate(i);
