@@ -150,7 +150,6 @@ public class RayTracer {
 
 	}
 
-	
 	private Color ArrayToColor(String[] array, int index) {
 		return new Color(Double.parseDouble(array[index]), Double.parseDouble(array[index + 1]),
 				Double.parseDouble(array[index + 2]));
@@ -180,7 +179,7 @@ public class RayTracer {
 
 		for (int i = 0; i < imageWidth; i++) {
 			for (int j = 0; j < imageHeight; j++) {
-				if (i == 220 && j == 490)
+				if (i == 275 && j == 433)
 					sacle = (camera.ScreenHeight / 2) / camera.ScreenDistance;
 				Ray ray = constructRayThroughPixel(i, j);
 				Color color = getColor(ray, settings.MaxRecursion, null);
@@ -232,7 +231,7 @@ public class RayTracer {
 		if (intersection == null)
 			return settings.Background;
 		Surface surface = intersection.getSurface();
-		
+
 		Color diffuseColor = new Color();
 		Color specularColor = new Color();
 		if (surface.Material.Transparency != 1) {
@@ -244,11 +243,11 @@ public class RayTracer {
 			specularColor = diffuseColor.multColor(specularColor.multColor(surface.Material.Specular));
 			diffuseColor = diffuseColor.multColor(surface.Material.Diffuse);
 		}
-		
+
 		Color backgroundColor = new Color();
 		if (surface.Material.Transparency != 0)
 			backgroundColor = getColor(ray, recursionNum - 1, surface);
-		
+
 		Color reflectionColor = new Color();
 		if (!surface.Material.Reflection.equals(new Color()))
 			reflectionColor = getReflectionColor(ray, recursionNum, intersection, surface);
@@ -279,7 +278,10 @@ public class RayTracer {
 		Vector r = normal.scalarMult(2 * normal.dotProduct(l)).substruct(l);
 		r = (Vector) r.normalize().scalarMult(-1);
 		Vector v = (Vector) ray.getDirection().scalarMult(-1);
-		double phong = Math.pow(v.dotProduct(r), intersection.getSurface().Material.Phong);
+		double theta = v.dotProduct(r);
+		if (theta < 0)
+			theta = v.dotProduct(r.scalarMult(-1));
+		double phong = Math.pow(theta, intersection.getSurface().Material.Phong);
 		return light.Color.mult(phong * light.SpecularIntensity);
 	}
 
@@ -335,11 +337,13 @@ public class RayTracer {
 		if (hasShadow) {
 			// shadowColor = (Vector) shadowColor.scalarMult();
 
-			shadowColor = (Vector) shadowColor.scalarMult(Math.max(shadow,1 - light.ShadowIntensity));
-			/*if (shadow != 0)
-				shadowColor = (Vector) shadowColor.scalarMult(Math.max(shadow,1 - light.ShadowIntensity);
-			else
-				shadowColor = (Vector) shadowColor.scalarMult(());*/
+			shadowColor = (Vector) shadowColor.scalarMult(Math.max(shadow, 1 - light.ShadowIntensity));
+			/*
+			 * if (shadow != 0) shadowColor = (Vector)
+			 * shadowColor.scalarMult(Math.max(shadow,1 -
+			 * light.ShadowIntensity); else shadowColor = (Vector)
+			 * shadowColor.scalarMult(());
+			 */
 
 		}
 		return shadowColor;
@@ -360,7 +364,6 @@ public class RayTracer {
 		return MathHelper.getNormalizeVector(position, planePoint);
 
 	}
-
 
 	private Intersection getMinIntersection(Ray ray, Surface currentSurface) {
 
