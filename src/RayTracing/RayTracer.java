@@ -113,7 +113,7 @@ public class RayTracer {
 					System.out.println(String.format("Parsed general settings (line %d)", lineNum));
 				} else if (code.equals("mtl")) {
 					materials.add(new Material(ArrayToColor(params, 0), ArrayToColor(params, 3),
-							 ArrayToColor(params, 6),Double.parseDouble(params[9]), Double.parseDouble(params[10])));
+							ArrayToColor(params, 6), Double.parseDouble(params[9]), Double.parseDouble(params[10])));
 					System.out.println(String.format("Parsed material (line %d)", lineNum));
 				} else if (code.equals("sph")) {
 					Sphere sphere = new Sphere(ArrayToPoint(params, 0), Double.parseDouble(params[3]));
@@ -178,12 +178,16 @@ public class RayTracer {
 
 		for (int i = 0; i < imageWidth; i++) {
 			for (int j = 0; j < imageHeight; j++) {
+				if (i == 315 && j == 266)
+					sacle = (camera.ScreenHeight / 2) / camera.ScreenDistance;
 				Ray ray = constructRayThroughPixel(i, j);
-				Color color = getColor(ray, settings.MaxRecursion,null);
+				Color color = getColor(ray, settings.MaxRecursion, null);
 				rgbData[(j * this.imageWidth + i) * 3] = color.getRInByte();
 				rgbData[(j * this.imageWidth + i) * 3 + 1] = color.getGInByte();
 				rgbData[(j * this.imageWidth + i) * 3 + 2] = color.getBInByte();
 			}
+
+			System.out.println(i);
 		}
 		// Put your ray tracing code here!
 		//
@@ -235,32 +239,124 @@ public class RayTracer {
 		Intersection intersection = getMinIntersection(ray, currentSurface);
 		if (intersection == null)
 			return settings.Background;
-		Surface surface =intersection.getSurface();
-		Color color = new Color();
-		for (Light light : lights) {
-			color = color.addColor(getColor(light, ray, intersection));
+		Surface surface = intersection.getSurface();
+		Color diffuseColor = new Color();
+		Color specularColor = new Color();
+		if (surface.Material.Transparency != 1) {
+			for (Light light : lights) {
+				diffuseColor = diffuseColor.addColor(getColor(light, ray, intersection));
+				specularColor = specularColor.addColor(getSpecularColor(light, ray, intersection));
+			}
+
+			specularColor = diffuseColor.multColor(specularColor.multColor(surface.Material.Specular));
+			diffuseColor = diffuseColor.multColor(surface.Material.Diffuse);
 		}
-		color = color.multColor(surface.Material.Diffuse);
-		Color backgroundColor=getColor(ray,recursionNum-1,surface);
-		
-		Vector reflectionNormal=intersection.getSurface().getNormal(intersection.getPoint(),ray.getDirection());
-		Vector reflectionVector=(Vector) reflectionNormal.scalarMult(2*reflectionNormal.dotProduct(ray.getDirection())).substruct(ray.getDirection());
+		Color backgroundColor = new Color();
+		if (surface.Material.Transparency != 0)
+			backgroundColor = getColor(ray, recursionNum - 1, surface);
+		Color reflectionColor = new Color();
+		if (!surface.Material.Reflection.equals(new Color()))
+			reflectionColor = getReflectionColor(ray, recursionNum, intersection, surface);
+
+		return backgroundColor.mult(surface.Material.Transparency)
+				.addColor(diffuseColor.addColor(specularColor).mult(1 - surface.Material.Transparency))
+				.addColor(reflectionColor);
+	}
+
+	private Color getReflectionColor(Ray ray, int recursionNum, Intersection intersection, Surface surface) {
+
+		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
+
+		Vector reflectionVector = normal.scalarMult(2 * normal.dotProduct(ray.getDirection()))
+				.substruct(ray.getDirection());
 		reflectionVector = (Vector) reflectionVector.normalize().scalarMult(-1);
-		Ray reflectionRay = new Ray(intersection.getPoint(), reflectionNormal);
-		Color reflectionColor=getColor(new Ray(reflectionRay.getPointOnRay(0), reflectionVector), recursionNum-1,surface).multColor(surface.Material.Reflection);
-		
-		return backgroundColor.mult(surface.Material.Transparency).addColor(color.mult(1-surface.Material.Transparency)).addColor(reflectionColor);
+		Ray reflectionRay = new Ray(intersection.getPoint(), normal);
+		Color reflectionColor = getColor(new Ray(reflectionRay.getPointOnRay(0), reflectionVector), recursionNum - 1,
+				surface).multColor(surface.Material.Reflection);
+
+		return reflectionColor;
+	}
+
+	private Color getSpecularColor(Light light, Ray ray, Intersection intersection) {
+
+		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
+		Vector l = (Vector) MathHelper.getNormalizeVector(intersection.getPoint(), light.Position).scalarMult(-1);
+		Vector r = normal.scalarMult(2 * normal.dotProduct(l)).substruct(l);
+		r = (Vector) r.normalize().scalarMult(-1);
+		Vector v = (Vector) ray.getDirection().scalarMult(-1);
+		double phong = Math.pow(v.dotProduct(r), intersection.getSurface().Material.Phong);
+		return light.Color.mult(phong * light.SpecularIntensity);
 	}
 
 	private Color getColor(Light light, Ray ray, Intersection intersection) {
 		Vector normalPlane = MathHelper.getNormalizeVector(light.Position, intersection.getPoint());
-		double offsetPlane =normalPlane.dotProduct(light.Position);
-		Intersection shadowIntersection = getMinIntersection(new Ray(light.Position, normalPlane), null);
-		if(shadowIntersection!=null && shadowIntersection.getSurface() == intersection.getSurface()){
-			return light.Color;
-		}
-		return new Color();
+		double offsetPlane = normalPlane.dotProduct(light.Position);
+		double sumOfPoint = Math.pow(settings.ShadowRays, 2);
 
+		Vector w = normalPlane;
+		Vector u = MathHelper.crossProduct(w, findPlaneUpVector(normalPlane, offsetPlane, light.Position));
+		Vector v = MathHelper.crossProduct(u, w);
+
+		double pixelW = light.Radius / settings.ShadowRays;
+		double pixelH = light.Radius / settings.ShadowRays;
+		Random rnd = new Random();
+
+		Vector shadowColors = new Vector();
+		for (int i = 0; i < settings.ShadowRays; i++) {
+			for (int j = 0; j < settings.ShadowRays; j++) {
+
+				Vector uDelta = (Vector) u.scalarMult(pixelW * ((settings.ShadowRays / 2) - i + rnd.nextDouble()));
+				Vector vDelta = (Vector) v.scalarMult(pixelH * ((settings.ShadowRays / 2) - j + rnd.nextDouble()));
+
+				Point res = (Point) light.Position.add(uDelta.add(vDelta));
+
+				Ray shadowRay = new Ray(res, MathHelper.getNormalizeVector(res, intersection.getPoint()));
+				double distance = intersection.getPoint().calcDistance(res);
+				ArrayList<Intersection> intersections = getClouserIntersection(shadowRay, null,
+						intersection.getPoint().calcDistance(res));
+				Vector shadowColor = new Vector(light.Color.getR(), light.Color.getG(), light.Color.getB());
+				for (Intersection intersection2 : intersections) {
+					if (intersection2.getPoint().calcDistance(intersection.getPoint()) > 0.0001)
+						shadowColor = (Vector) shadowColor.scalarMult(intersection2.getSurface().Material.Transparency);
+				}
+				shadowColors = (Vector) shadowColors.add(shadowColor);
+			}
+		}
+		shadowColors = (Vector) shadowColors.scalarMult(1 / sumOfPoint);
+		Color lightColor = new Color(shadowColors.getCoordinate(0), shadowColors.getCoordinate(1),
+				shadowColors.getCoordinate(2));
+		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
+		return lightColor.mult(Math.abs(normal.dotProduct(normalPlane.scalarMult(-1))) * light.ShadowIntensity);
+	}
+
+	private Vector findPlaneUpVector(Vector normalPlane, double offsetPlane, Point position) {
+
+		Point planePoint = null;
+		if (normalPlane.getCoordinate(0) != 0.0)
+			planePoint = new Point(offsetPlane, 0, 0);
+		else if (normalPlane.getCoordinate(1) != 0.0)
+			planePoint = new Point(0, offsetPlane, 0);
+		else
+			planePoint = new Point(0, 0, offsetPlane);
+		return MathHelper.getNormalizeVector(position, planePoint);
+
+	}
+
+	private Ray constructRayThroughPlane(int i, int j) {
+
+		Vector w = camera.Direction;
+		Vector u = MathHelper.crossProduct(w, camera.Up);
+		Vector v = MathHelper.crossProduct(u, w);
+
+		double pixelW = camera.ScreenWidth / imageWidth;
+		double pixelH = camera.ScreenHeight / imageHeight;
+		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance);
+		Vector uDelta = (Vector) u.scalarMult(pixelW * ((imageWidth / 2) - i + 0.5));
+		Vector vDelta = (Vector) v.scalarMult(pixelH * ((imageHeight / 2) - j + 0.5));
+
+		Point res = (Point) camera.Position.add(wDelta.add(uDelta).add(vDelta));
+
+		return new Ray(res, MathHelper.getNormalizeVector(camera.Position, res));
 
 	}
 
@@ -281,6 +377,539 @@ public class RayTracer {
 			}
 		}
 		return minIntersection;
+	}
+
+	private ArrayList<Intersection> getClouserIntersection(Ray ray, Surface currentSurface, double distance) {
+
+		ArrayList<Intersection> intersections = new ArrayList<Intersection>();
+		for (Surface surface : surfaces) {
+			Intersection surfaceIntersection = surface.findIntersection(ray);
+			if (surfaceIntersection != null) {
+				if (surfaceIntersection != null) {
+					double newDistance = surfaceIntersection.getDistance();
+					if (distance > newDistance) {
+						intersections.add(surfaceIntersection);
+					}
+				}
+			}
+		}
+		return intersections;
+	}
+
+	// ////////////////////// FUNCTIONS TO SAVE IMAGES IN PNG FORMAT
+	// //////////////////////////////////////////
+
+	/*
+	 * Saves RGB data as an image in png format to the specified location.
+	 */
+	public static void saveImage(int width, byte[] rgbData, String fileName) {
+		try {
+
+			BufferedImage image = bytes2RGB(width, rgbData);
+			ImageIO.write(image, "png", new File(fileName));
+
+		} catch (IOException e) {
+			System.out.println("ERROR SAVING FILE: " + e.getMessage());
+		}
+
+	}
+
+	/*
+	 * Producing a BufferedImage that can be saved as png from a byte array of
+	 * RGB values.
+	 */
+	public static BufferedImage bytes2RGB(int width, byte[] buffer) {
+		int height = buffer.length / width / 3;
+		ColorSpace cs = ColorSpace.getInstance(ColorSpace.CS_sRGB);
+		ColorModel cm = new ComponentColorModel(cs, false, false, Transparency.OPAQUE, DataBuffer.TYPE_BYTE);
+		SampleModel sm = cm.createCompatibleSampleModel(width, height);
+		DataBufferByte db = new DataBufferByte(buffer, width * height);
+		WritableRaster raster = Raster.createWritableRaster(sm, db, null);
+		BufferedImage result = new BufferedImage(cm, raster, false, null);
+
+		return result;
+	}
+
+	public static class RayTracerException extends Exception {
+		public RayTracerException(String msg) {
+			super(msg);
+		}
+	}
+
+}
+
+				Point res = (Point) light.Position.add(uDelta.add(vDelta));
+
+				Ray shadowRay = new Ray(res, MathHelper.getNormalizeVector(res, intersection.getPoint()));
+				double distance = intersection.getPoint().calcDistance(res);
+				ArrayList<Intersection> intersections = getClouserIntersection(shadowRay, null,
+						intersection.getPoint().calcDistance(res));
+				Vector shadowColor = new Vector(light.Color.getR(), light.Color.getG(), light.Color.getB());
+				for (Intersection intersection2 : intersections) {
+					if (intersection2.getPoint().calcDistance(intersection.getPoint()) > 0.0001)
+						shadowColor = (Vector) shadowColor.scalarMult(intersection2.getSurface().Material.Transparency);
+				}
+				shadowColors = (Vector) shadowColors.add(shadowColor);
+			}
+		}
+		shadowColors = (Vector) shadowColors.scalarMult(1 / sumOfPoint);
+		Color lightColor = new Color(shadowColors.getCoordinate(0), shadowColors.getCoordinate(1),
+				shadowColors.getCoordinate(2));
+		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
+		return lightColor.mult(Math.abs(normal.dotProduct(normalPlane.scalarMult(-1))) * light.ShadowIntensity);
+	}
+
+	private Vector findPlaneUpVector(Vector normalPlane, double offsetPlane, Point position) {
+
+		Point planePoint = null;
+		if (normalPlane.getCoordinate(0) != 0.0)
+			planePoint = new Point(offsetPlane, 0, 0);
+		else if (normalPlane.getCoordinate(1) != 0.0)
+			planePoint = new Point(0, offsetPlane, 0);
+		else
+			planePoint = new Point(0, 0, offsetPlane);
+		return MathHelper.getNormalizeVector(position, planePoint);
+
+	}
+
+	private Ray constructRayThroughPlane(int i, int j) {
+
+		Vector w = camera.Direction;
+		Vector u = MathHelper.crossProduct(w, camera.Up);
+		Vector v = MathHelper.crossProduct(u, w);
+
+		double pixelW = camera.ScreenWidth / imageWidth;
+		double pixelH = camera.ScreenHeight / imageHeight;
+		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance);
+		Vector uDelta = (Vector) u.scalarMult(pixelW * ((imageWidth / 2) - i + 0.5));
+		Vector vDelta = (Vector) v.scalarMult(pixelH * ((imageHeight / 2) - j + 0.5));
+
+		Point res = (Point) camera.Position.add(wDelta.add(uDelta).add(vDelta));
+
+		return new Ray(res, MathHelper.getNormalizeVector(camera.Position, res));
+
+	}
+
+	private Intersection getMinIntersection(Ray ray, Surface currentSurface) {
+
+		double minDistance = Double.MAX_VALUE;
+		Intersection minIntersection = null;
+		for (Surface surface : surfaces) {
+			if (currentSurface != surface) {
+				Intersection surfaceIntersection = surface.findIntersection(ray);
+				if (surfaceIntersection != null) {
+					double distance = surfaceIntersection.getDistance();
+					if (minDistance > distance && distance >= 0) {
+						minDistance = surfaceIntersection.getDistance();
+						minIntersection = surfaceIntersection;
+					}
+				}
+			}
+		}
+		return minIntersection;
+	}
+
+	private ArrayList<Intersection> getClouserIntersection(Ray ray, Surface currentSurface, double distance) {
+
+		ArrayList<Intersection> intersections = new ArrayList<Intersection>();
+		for (Surface surface : surfaces) {
+			Intersection surfaceIntersection = surface.findIntersection(ray);
+			if (surfaceIntersection != null) {
+				if (surfaceIntersection != null) {
+					double newDistance = surfaceIntersection.getDistance();
+					if (distance > newDistance) {
+						intersections.add(surfaceIntersection);
+					}
+				}
+			}
+		}
+		return intersections;
+	}
+
+	// ////////////////////// FUNCTIONS TO SAVE IMAGES IN PNG FORMAT
+	// //////////////////////////////////////////
+
+	/*
+	 * Saves RGB data as an image in png format to the specified location.
+	 */
+	public static void saveImage(int width, byte[] rgbData, String fileName) {
+		try {
+
+			BufferedImage image = bytes2RGB(width, rgbData);
+			ImageIO.write(image, "png", new File(fileName));
+
+		} catch (IOException e) {
+			System.out.println("ERROR SAVING FILE: " + e.getMessage());
+		}
+
+	}
+
+	/*
+	 * Producing a BufferedImage that can be saved as png from a byte array of
+	 * RGB values.
+	 */
+	public static BufferedImage bytes2RGB(int width, byte[] buffer) {
+		int height = buffer.length / width / 3;
+		ColorSpace cs = ColorSpace.getInstance(ColorSpace.CS_sRGB);
+		ColorModel cm = new ComponentColorModel(cs, false, false, Transparency.OPAQUE, DataBuffer.TYPE_BYTE);
+		SampleModel sm = cm.createCompatibleSampleModel(width, height);
+		DataBufferByte db = new DataBufferByte(buffer, width * height);
+		WritableRaster raster = Raster.createWritableRaster(sm, db, null);
+		BufferedImage result = new BufferedImage(cm, raster, false, null);
+
+		return result;
+	}
+
+	public static class RayTracerException extends Exception {
+		public RayTracerException(String msg) {
+			super(msg);
+		}
+	}
+
+}- j + rnd.nextDouble()));
+
+				Point res = (Point) light.Position.add(uDelta.add(vDelta));
+
+				Ray shadowRay = new Ray(res, MathHelper.getNormalizeVector(res, intersection.getPoint()));
+				double distance = intersection.getPoint().calcDistance(res);
+				ArrayList<Intersection> intersections = getClouserIntersection(shadowRay, null,
+						intersection.getPoint().calcDistance(res));
+				Vector shadowColor = new Vector(light.Color.getR(), light.Color.getG(), light.Color.getB());
+				for (Intersection intersection2 : intersections) {
+					if (intersection2.getPoint().calcDistance(intersection.getPoint()) > 0.0001)
+						shadowColor = (Vector) shadowColor.scalarMult(intersection2.getSurface().Material.Transparency);
+				}
+				shadowColors = (Vector) shadowColors.add(shadowColor);
+			}
+		}
+		shadowColors = (Vector) shadowColors.scalarMult(1 / sumOfPoint);
+		Color lightColor = new Color(shadowColors.getCoordinate(0), shadowColors.getCoordinate(1),
+				shadowColors.getCoordinate(2));
+		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
+		return lightColor.mult(Math.abs(normal.dotProduct(normalPlane.scalarMult(-1))) * light.ShadowIntensity);
+	}
+
+	private Vector findPlaneUpVector(Vector normalPlane, double offsetPlane, Point position) {
+
+		Point planePoint = null;
+		if (normalPlane.getCoordinate(0) != 0.0)
+			planePoint = new Point(offsetPlane, 0, 0);
+		else if (normalPlane.getCoordinate(1) != 0.0)
+			planePoint = new Point(0, offsetPlane, 0);
+		else
+			planePoint = new Point(0, 0, offsetPlane);
+		return MathHelper.getNormalizeVector(position, planePoint);
+
+	}
+
+	private Ray constructRayThroughPlane(int i, int j) {
+
+		Vector w = camera.Direction;
+		Vector u = MathHelper.crossProduct(w, camera.Up);
+		Vector v = MathHelper.crossProduct(u, w);
+
+		double pixelW = camera.ScreenWidth / imageWidth;
+		double pixelH = camera.ScreenHeight / imageHeight;
+		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance);
+		Vector uDelta = (Vector) u.scalarMult(pixelW * ((imageWidth / 2) - i + 0.5));
+		Vector vDelta = (Vector) v.scalarMult(pixelH * ((imageHeight / 2) - j + 0.5));
+
+		Point res = (Point) camera.Position.add(wDelta.add(uDelta).add(vDelta));
+
+		return new Ray(res, MathHelper.getNormalizeVector(camera.Position, res));
+
+	}
+
+	private Intersection getMinIntersection(Ray ray, Surface currentSurface) {
+
+		double minDistance = Double.MAX_VALUE;
+		Intersection minIntersection = null;
+		for (Surface surface : surfaces) {
+			if (currentSurface != surface) {
+				Intersection surfaceIntersection = surface.findIntersection(ray);
+				if (surfaceIntersection != null) {
+					double distance = surfaceIntersection.getDistance();
+					if (minDistance > distance && distance >= 0) {
+						minDistance = surfaceIntersection.getDistance();
+						minIntersection = surfaceIntersection;
+					}
+				}
+			}
+		}
+		return minIntersection;
+	}
+
+	private ArrayList<Intersection> getClouserIntersection(Ray ray, Surface currentSurface, double distance) {
+
+		ArrayList<Intersection> intersections = new ArrayList<Intersection>();
+		for (Surface surface : surfaces) {
+			Intersection surfaceIntersection = surface.findIntersection(ray);
+			if (surfaceIntersection != null) {
+				if (surfaceIntersection != null) {
+					double newDistance = surfaceIntersection.getDistance();
+					if (distance > newDistance) {
+						intersections.add(surfaceIntersection);
+					}
+				}
+			}
+		}
+		return intersections;
+	}
+
+	// ////////////////////// FUNCTIONS TO SAVE IMAGES IN PNG FORMAT
+	// //////////////////////////////////////////
+
+	/*
+	 * Saves RGB data as an image in png format to the specified location.
+	 */
+	public static void saveImage(int width, byte[] rgbData, String fileName) {
+		try {
+
+			BufferedImage image = bytes2RGB(width, rgbData);
+			ImageIO.write(image, "png", new File(fileName));
+
+		} catch (IOException e) {
+			System.out.println("ERROR SAVING FILE: " + e.getMessage());
+		}
+
+	}
+
+	/*
+	 * Producing a BufferedImage that can be saved as png from a byte array of
+	 * RGB values.
+	 */
+	public static BufferedImage bytes2RGB(int width, byte[] buffer) {
+		int height = buffer.length / width / 3;
+		ColorSpace cs = ColorSpace.getInstance(ColorSpace.CS_sRGB);
+		ColorModel cm = new ComponentColorModel(cs, false, false, Transparency.OPAQUE, DataBuffer.TYPE_BYTE);
+		SampleModel sm = cm.createCompatibleSampleModel(width, height);
+		DataBufferByte db = new DataBufferByte(buffer, width * height);
+		WritableRaster raster = Raster.createWritableRaster(sm, db, null);
+		BufferedImage result = new BufferedImage(cm, raster, false, null);
+
+		return result;
+	}
+
+	public static class RayTracerException extends Exception {
+		public RayTracerException(String msg) {
+			super(msg);
+		}
+	}
+
+}
+
+				Point res = (Point) light.Position.add(uDelta.add(vDelta));
+
+				Ray shadowRay = new Ray(res, MathHelper.getNormalizeVector(res, intersection.getPoint()));
+				double distance = intersection.getPoint().calcDistance(res);
+				ArrayList<Intersection> intersections = getClouserIntersection(shadowRay, null,
+						intersection.getPoint().calcDistance(res));
+				Vector shadowColor = new Vector(light.Color.getR(), light.Color.getG(), light.Color.getB());
+				for (Intersection intersection2 : intersections) {
+					if (intersection2.getPoint().calcDistance(intersection.getPoint()) > 0.0001)
+						shadowColor = (Vector) shadowColor.scalarMult(intersection2.getSurface().Material.Transparency);
+				}
+				shadowColors = (Vector) shadowColors.add(shadowColor);
+			}
+		}
+		shadowColors = (Vector) shadowColors.scalarMult(1 / sumOfPoint);
+		Color lightColor = new Color(shadowColors.getCoordinate(0), shadowColors.getCoordinate(1),
+				shadowColors.getCoordinate(2));
+		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
+		return lightColor.mult(Math.abs(normal.dotProduct(normalPlane.scalarMult(-1))) * light.ShadowIntensity);
+	}
+
+	private Vector findPlaneUpVector(Vector normalPlane, double offsetPlane, Point position) {
+
+		Point planePoint = null;
+		if (normalPlane.getCoordinate(0) != 0.0)
+			planePoint = new Point(offsetPlane, 0, 0);
+		else if (normalPlane.getCoordinate(1) != 0.0)
+			planePoint = new Point(0, offsetPlane, 0);
+		else
+			planePoint = new Point(0, 0, offsetPlane);
+		return MathHelper.getNormalizeVector(position, planePoint);
+
+	}
+
+	private Ray constructRayThroughPlane(int i, int j) {
+
+		Vector w = camera.Direction;
+		Vector u = MathHelper.crossProduct(w, camera.Up);
+		Vector v = MathHelper.crossProduct(u, w);
+
+		double pixelW = camera.ScreenWidth / imageWidth;
+		double pixelH = camera.ScreenHeight / imageHeight;
+		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance);
+		Vector uDelta = (Vector) u.scalarMult(pixelW * ((imageWidth / 2) - i + 0.5));
+		Vector vDelta = (Vector) v.scalarMult(pixelH * ((imageHeight / 2) - j + 0.5));
+
+		Point res = (Point) camera.Position.add(wDelta.add(uDelta).add(vDelta));
+
+		return new Ray(res, MathHelper.getNormalizeVector(camera.Position, res));
+
+	}
+
+	private Intersection getMinIntersection(Ray ray, Surface currentSurface) {
+
+		double minDistance = Double.MAX_VALUE;
+		Intersection minIntersection = null;
+		for (Surface surface : surfaces) {
+			if (currentSurface != surface) {
+				Intersection surfaceIntersection = surface.findIntersection(ray);
+				if (surfaceIntersection != null) {
+					double distance = surfaceIntersection.getDistance();
+					if (minDistance > distance && distance >= 0) {
+						minDistance = surfaceIntersection.getDistance();
+						minIntersection = surfaceIntersection;
+					}
+				}
+			}
+		}
+		return minIntersection;
+	}
+
+	private ArrayList<Intersection> getClouserIntersection(Ray ray, Surface currentSurface, double distance) {
+
+		ArrayList<Intersection> intersections = new ArrayList<Intersection>();
+		for (Surface surface : surfaces) {
+			Intersection surfaceIntersection = surface.findIntersection(ray);
+			if (surfaceIntersection != null) {
+				if (surfaceIntersection != null) {
+					double newDistance = surfaceIntersection.getDistance();
+					if (distance > newDistance) {
+						intersections.add(surfaceIntersection);
+					}
+				}
+			}
+		}
+		return intersections;
+	}
+
+	// ////////////////////// FUNCTIONS TO SAVE IMAGES IN PNG FORMAT
+	// //////////////////////////////////////////
+
+	/*
+	 * Saves RGB data as an image in png format to the specified location.
+	 */
+	public static void saveImage(int width, byte[] rgbData, String fileName) {
+		try {
+
+			BufferedImage image = bytes2RGB(width, rgbData);
+			ImageIO.write(image, "png", new File(fileName));
+
+		} catch (IOException e) {
+			System.out.println("ERROR SAVING FILE: " + e.getMessage());
+		}
+
+	}
+
+	/*
+	 * Producing a BufferedImage that can be saved as png from a byte array of
+	 * RGB values.
+	 */
+	public static BufferedImage bytes2RGB(int width, byte[] buffer) {
+		int height = buffer.length / width / 3;
+		ColorSpace cs = ColorSpace.getInstance(ColorSpace.CS_sRGB);
+		ColorModel cm = new ComponentColorModel(cs, false, false, Transparency.OPAQUE, DataBuffer.TYPE_BYTE);
+		SampleModel sm = cm.createCompatibleSampleModel(width, height);
+		DataBufferByte db = new DataBufferByte(buffer, width * height);
+		WritableRaster raster = Raster.createWritableRaster(sm, db, null);
+		BufferedImage result = new BufferedImage(cm, raster, false, null);
+
+		return result;
+	}
+
+	public static class RayTracerException extends Exception {
+		public RayTracerException(String msg) {
+			super(msg);
+		}
+	}
+
+} intersection.getPoint()));
+				double distance = intersection.getPoint().calcDistance(res);
+				ArrayList<Intersection> intersections = getClouserIntersection(shadowRay, null,
+						intersection.getPoint().calcDistance(res));
+				Vector shadowColor = new Vector(light.Color.getR(), light.Color.getG(), light.Color.getB());
+				for (Intersection intersection2 : intersections) {
+					if (intersection2.getPoint().calcDistance(intersection.getPoint()) > 0.0001)
+						shadowColor = (Vector) shadowColor.scalarMult(intersection2.getSurface().Material.Transparency);
+				}
+				shadowColors = (Vector) shadowColors.add(shadowColor);
+			}
+		}
+		shadowColors = (Vector) shadowColors.scalarMult(1 / sumOfPoint);
+		Color lightColor = new Color(shadowColors.getCoordinate(0), shadowColors.getCoordinate(1),
+				shadowColors.getCoordinate(2));
+		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
+		return lightColor.mult(Math.abs(normal.dotProduct(normalPlane.scalarMult(-1))) * light.ShadowIntensity);
+	}
+
+	private Vector findPlaneUpVector(Vector normalPlane, double offsetPlane, Point position) {
+
+		Point planePoint = null;
+		if (normalPlane.getCoordinate(0) != 0.0)
+			planePoint = new Point(offsetPlane, 0, 0);
+		else if (normalPlane.getCoordinate(1) != 0.0)
+			planePoint = new Point(0, offsetPlane, 0);
+		else
+			planePoint = new Point(0, 0, offsetPlane);
+		return MathHelper.getNormalizeVector(position, planePoint);
+
+	}
+
+	private Ray constructRayThroughPlane(int i, int j) {
+
+		Vector w = camera.Direction;
+		Vector u = MathHelper.crossProduct(w, camera.Up);
+		Vector v = MathHelper.crossProduct(u, w);
+
+		double pixelW = camera.ScreenWidth / imageWidth;
+		double pixelH = camera.ScreenHeight / imageHeight;
+		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance);
+		Vector uDelta = (Vector) u.scalarMult(pixelW * ((imageWidth / 2) - i + 0.5));
+		Vector vDelta = (Vector) v.scalarMult(pixelH * ((imageHeight / 2) - j + 0.5));
+
+		Point res = (Point) camera.Position.add(wDelta.add(uDelta).add(vDelta));
+
+		return new Ray(res, MathHelper.getNormalizeVector(camera.Position, res));
+
+	}
+
+	private Intersection getMinIntersection(Ray ray, Surface currentSurface) {
+
+		double minDistance = Double.MAX_VALUE;
+		Intersection minIntersection = null;
+		for (Surface surface : surfaces) {
+			if (currentSurface != surface) {
+				Intersection surfaceIntersection = surface.findIntersection(ray);
+				if (surfaceIntersection != null) {
+					double distance = surfaceIntersection.getDistance();
+					if (minDistance > distance && distance >= 0) {
+						minDistance = surfaceIntersection.getDistance();
+						minIntersection = surfaceIntersection;
+					}
+				}
+			}
+		}
+		return minIntersection;
+	}
+
+	private ArrayList<Intersection> getClouserIntersection(Ray ray, Surface currentSurface, double distance) {
+
+		ArrayList<Intersection> intersections = new ArrayList<Intersection>();
+		for (Surface surface : surfaces) {
+			Intersection surfaceIntersection = surface.findIntersection(ray);
+			if (surfaceIntersection != null) {
+				if (surfaceIntersection != null) {
+					double newDistance = surfaceIntersection.getDistance();
+					if (distance > newDistance) {
+						intersections.add(surfaceIntersection);
+					}
+				}
+			}
+		}
+		return intersections;
 	}
 
 	// ////////////////////// FUNCTIONS TO SAVE IMAGES IN PNG FORMAT
