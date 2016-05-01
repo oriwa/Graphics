@@ -38,41 +38,39 @@ public class RayTracer {
 	 * @throws IOException
 	 */
 	public static void main(String[] args) throws IOException, RayTracerException {
-		//
-		// try {
 
-		RayTracer tracer = new RayTracer();
+		try {
 
-		// Default values:
-		tracer.imageWidth = 500;
-		tracer.imageHeight = 500;
+			RayTracer tracer = new RayTracer();
 
-		// if (args.length < 2)
-		// throw new RayTracerException(
-		// "Not enough arguments provided. Please specify an input scene file
-		// and an output image file for rendering.");
+			// Default values:
+			tracer.imageWidth = 500;
+			tracer.imageHeight = 500;
 
-		String sceneFileName = args[0];
-		String outputFileName = args[1];
+			 if (args.length < 2)
+			 throw new RayTracerException( "Not enough arguments provided. Please specify an input scene file and an output image file for rendering.");
 
-		if (args.length > 3) {
-			tracer.imageWidth = Integer.parseInt(args[2]);
-			tracer.imageHeight = Integer.parseInt(args[3]);
+			String sceneFileName = args[0];
+			String outputFileName = args[1];
+
+			if (args.length > 3) {
+				tracer.imageWidth = Integer.parseInt(args[2]);
+				tracer.imageHeight = Integer.parseInt(args[3]);
+			}
+
+			// Parse scene file:
+			tracer.parseScene(sceneFileName);
+
+			// Render scene:
+			tracer.renderScene(outputFileName);
+
+		} catch (IOException e) {
+			System.out.println(e.getMessage());
+		} catch (RayTracerException e) {
+			System.out.println(e.getMessage());
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
 		}
-
-		// Parse scene file:
-		tracer.parseScene(sceneFileName);
-
-		// Render scene:
-		tracer.renderScene(outputFileName);
-
-		// } catch (IOException e) {
-		// System.out.println(e.getMessage());
-		// } catch (RayTracerException e) {
-		// System.out.println(e.getMessage());
-		// } catch (Exception e) {
-		// System.out.println(e.getMessage());
-		// }
 
 	}
 
@@ -142,7 +140,7 @@ public class RayTracer {
 				}
 			}
 		}
-		// TODO: Add Validation
+
 		// It is recommended that you check here that the scene is valid,
 		// for example camera settings and all necessary materials were defined.
 
@@ -150,16 +148,24 @@ public class RayTracer {
 
 	}
 
+	/**
+	 * creates Color from the 3 indexes from index
+	 */
 	private Color ArrayToColor(String[] array, int index) {
 		return new Color(Double.parseDouble(array[index]), Double.parseDouble(array[index + 1]),
 				Double.parseDouble(array[index + 2]));
 	}
-
+	
+	/**
+	 * creates Vector from the 3 indexes from index
+	 */
 	private Vector ArrayToVector(String[] array, int index) {
 		return new Vector(Double.parseDouble(array[index]), Double.parseDouble(array[index + 1]),
 				Double.parseDouble(array[index + 2]));
 	}
-
+	/**
+	 * creates Point from the 3 indexes from index
+	 */
 	private Point ArrayToPoint(String[] array, int index) {
 		return new Point(Double.parseDouble(array[index]), Double.parseDouble(array[index + 1]),
 				Double.parseDouble(array[index + 2]));
@@ -175,20 +181,16 @@ public class RayTracer {
 		byte[] rgbData = new byte[this.imageWidth * this.imageHeight * 3];
 		double ratio = imageWidth / imageHeight;
 		camera.ScreenHeight = camera.ScreenWidth * (1 / ratio);
-		double sacle = (camera.ScreenHeight / 2) / camera.ScreenDistance;
 		int lastPercent = -1;
 		for (int i = 0; i < imageWidth; i++) {
 			for (int j = 0; j < imageHeight; j++) {
-				if (i == 250 && j == 236)
-					sacle = (camera.ScreenHeight / 2) / camera.ScreenDistance;
-				sacle++;
 				Ray ray = constructRayThroughPixel(i, j);
 				Color color = getColor(ray, settings.MaxRecursion, null);
 				rgbData[(j * this.imageWidth + i) * 3] = color.getRInByte();
 				rgbData[(j * this.imageWidth + i) * 3 + 1] = color.getGInByte();
 				rgbData[(j * this.imageWidth + i) * 3 + 2] = color.getBInByte();
 			}
-			int percent = i*100/imageWidth;
+			int percent = (i + 1) * 100 / imageWidth;
 			if (percent != lastPercent) {
 				System.out.println("Rendering . . .  " + percent + "%");
 				lastPercent = percent;
@@ -210,6 +212,9 @@ public class RayTracer {
 
 	}
 
+	/**
+	 * construct ray through pixel i,j.
+	 */
 	private Ray constructRayThroughPixel(int i, int j) {
 
 		Vector w = camera.Direction;
@@ -219,7 +224,7 @@ public class RayTracer {
 		double pixelW = camera.ScreenWidth / imageWidth;
 		double pixelH = camera.ScreenHeight / imageHeight;
 
-		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance); 	
+		Vector wDelta = (Vector) w.scalarMult(camera.ScreenDistance);
 		Vector uDelta = (Vector) u.scalarMult(pixelW * ((imageWidth / 2) - i + 0.5));
 		Vector vDelta = (Vector) v.scalarMult(pixelH * ((imageHeight / 2) - j + 0.5));
 
@@ -229,6 +234,9 @@ public class RayTracer {
 
 	}
 
+	/**
+	 * return the ray view color ,ignores currentSurface Surface.
+	 */
 	private Color getColor(Ray ray, int recursionNum, Surface currentSurface) {
 		if (recursionNum == 0)
 			return settings.Background;
@@ -239,6 +247,7 @@ public class RayTracer {
 
 		Color diffuseColor = new Color();
 		Color specularColor = new Color();
+		//in case the surface transparent
 		if (surface.Material.Transparency != 1) {
 			for (Light light : lights) {
 				diffuseColor = diffuseColor.addColor(getColor(light, ray, intersection));
@@ -249,10 +258,12 @@ public class RayTracer {
 		}
 
 		Color backgroundColor = new Color();
+		//in case the surface opaque 
 		if (surface.Material.Transparency != 0)
 			backgroundColor = getColor(new Ray(intersection.getPoint(), ray.getDirection()), recursionNum - 1, surface);
 
 		Color reflectionColor = new Color();
+		//in case the surface doesn't reflect light 
 		if (!surface.Material.Reflection.equals(new Color()))
 			reflectionColor = getReflectionColor(ray, recursionNum, intersection, surface);
 
@@ -261,6 +272,9 @@ public class RayTracer {
 				.addColor(reflectionColor);
 	}
 
+	/**
+	 * return the ray view reflection color at intersection, ignores currentSurface Surface.
+	 */
 	private Color getReflectionColor(Ray ray, int recursionNum, Intersection intersection, Surface surface) {
 
 		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
@@ -275,6 +289,9 @@ public class RayTracer {
 		return reflectionColor;
 	}
 
+	/**
+	 * return the ray view light specular color at intersection.
+	 */
 	private Color getSpecularColor(Light light, Ray ray, Intersection intersection) {
 
 		Vector normal = intersection.getSurface().getNormal(intersection.getPoint(), ray.getDirection());
@@ -289,6 +306,10 @@ public class RayTracer {
 		return light.Color.mult(phong * light.SpecularIntensity);
 	}
 
+	/**
+	 * return the ray view light color.
+	 * calculate shadows
+	 */
 	private Color getColor(Light light, Ray ray, Intersection intersection) {
 		Vector normalPlane = MathHelper.getNormalizeVector(light.Position, intersection.getPoint());
 		double offsetPlane = normalPlane.dotProduct(light.Position);
@@ -324,6 +345,9 @@ public class RayTracer {
 		return lightColor.mult(Math.abs(normal.dotProduct(normalPlane.scalarMult(-1))));
 	}
 
+	/**
+	 * return the shadow ray light color.
+	 */
 	private Vector getShdowColor(Light light, Intersection intersection, Point res, Ray shadowRay) {
 		ArrayList<Intersection> intersections = getCloserIntersection(shadowRay, null,
 				intersection.getPoint().calcDistance(res));
@@ -331,28 +355,20 @@ public class RayTracer {
 		boolean hasShadow = false;
 		double shadow = 1.0;
 		for (Intersection intersection2 : intersections) {
-			if (intersection2.getPoint().calcDistance(intersection.getPoint()) >MathHelper.EPSILON) {
-				// shadowColor = (Vector)
-				// shadowColor.scalarMult(intersection2.getSurface().Material.Transparency);
+			if (intersection2.getPoint().calcDistance(intersection.getPoint()) > MathHelper.EPSILON) {
 				shadow *= intersection2.getSurface().Material.Transparency;
 				hasShadow = true;
 			}
 		}
 		if (hasShadow) {
-			// shadowColor = (Vector) shadowColor.scalarMult();
-
 			shadowColor = (Vector) shadowColor.scalarMult(Math.max(shadow, 1 - light.ShadowIntensity));
-			/*
-			 * if (shadow != 0) shadowColor = (Vector)
-			 * shadowColor.scalarMult(Math.max(shadow,1 -
-			 * light.ShadowIntensity); else shadowColor = (Vector)
-			 * shadowColor.scalarMult(());
-			 */
-
 		}
 		return shadowColor;
 	}
 
+	/**
+	 * return find up vector for the plane .
+	 */
 	private Vector findPlaneUpVector(Vector normalPlane, double offsetPlane, Point position) {
 
 		Point planePoint = null;
@@ -368,7 +384,10 @@ public class RayTracer {
 		return MathHelper.getNormalizeVector(position, planePoint);
 
 	}
-
+	
+	/**
+	 * return the first intersection with the ray , ignores currentSurface Surface.
+	 */
 	private Intersection getMinIntersection(Ray ray, Surface currentSurface) {
 
 		double minDistance = Double.MAX_VALUE;
@@ -388,6 +407,9 @@ public class RayTracer {
 		return minIntersection;
 	}
 
+	/**
+	 * return the intersections with the ray their distance is lower than distance, ignores currentSurface Surface.
+	 */
 	private ArrayList<Intersection> getCloserIntersection(Ray ray, Surface currentSurface, double distance) {
 
 		ArrayList<Intersection> intersections = new ArrayList<Intersection>();

@@ -3,7 +3,6 @@ package RayTracing.DM;
 import RayTracing.Intersection;
 import RayTracing.Ray;
 import RayTracing.Common.MathHelper;
-import RayTracing.DM.Math.Base3DComponent;
 import RayTracing.DM.Math.Point;
 import RayTracing.DM.Math.Vector;
 
